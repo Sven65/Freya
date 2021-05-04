@@ -1,4 +1,7 @@
 defmodule Freya.HTTP.APIRouter do
+	@moduledoc """
+	Handles requests for lambdas
+	"""
 	import Ecto.Query
 
 	use Plug.Router
@@ -11,26 +14,22 @@ defmodule Freya.HTTP.APIRouter do
   	plug :dispatch
 
 
-
-	#plug :dispatch
-
+	@doc """
+	Creates a random string with specified length
+	"""
 	def randomString(length) do
 		:crypto.strong_rand_bytes(length) |> Base.url_encode64 |> binary_part(0, length)
 	end
-	
 
-	get "/" do
-		send_resp(conn, 200, "Hello from router")
-	end
+	@doc """
+	Creates a lambda if it doesn't exist
+	"""
+	def createLambda(params) do
+		lambdaName = params["name"]
 
-	post "/create" do
-		IO.inspect conn.params, label: "Photo upload information"
-
-		upload = conn.params["file"]
+		upload = params["file"]
 	
 		extension = Path.extname(upload.filename)
-
-		IO.inspect File.read!(upload.path)
 
 		fileString = randomString(16)
 
@@ -39,21 +38,58 @@ defmodule Freya.HTTP.APIRouter do
   		File.cp(upload.path, filePath)
 
 		lambda = %Freya.Lambda.Item{
-			name: conn.params["name"],
+			name: lambdaName,
+
 			file: "js/#{upload.filename}-#{fileString}#{extension}",
-			runFunction: conn.params["runFunction"]
+			runFunction: params["runFunction"]
 		}
 
 		Freya.Repo.insert(lambda)
 
-		# uploadData = %Freya.HTTP.CreationParams{
-		# 	conn.params
-		# }
+		{:ok, 201, "Created"}
+	end
 
-		# TODO: you can copy the uploaded file now,
-		#       because it gets deleted after this request
-		#json(conn, "Uploaded #{upload.photo.filename} to a temporary directory")
-		send_resp(conn, 201, "Created")
+	@doc """
+	Executes a lambda
+	"""
+	def executeLambda(lambda) do
+		filePath = Path.join(File.cwd!(), lambda.file)
+		
+		result = 
+			if (lambda.runFunction) do
+				NodeJS.call({filePath, lambda.runFunction})
+			else
+				NodeJS.call(filePath)
+			end
+		
+		{ status, output } = result
+
+		cond do
+			status == :error -> {:error, 500, output}
+			status == :ok -> {:ok, 200, output}
+		end
+	end
+	
+
+	get "/" do
+		send_resp(conn, 200, "Hello from router")
+	end
+
+	post "/create" do
+		lambdaName = conn.params["name"]
+
+		query = from l in Freya.Lambda.Item, where: l.name == ^lambdaName, select: l
+
+		lambdaItem = Freya.Repo.one(query)
+
+		returnData = cond do 
+			!is_nil(lambdaItem) -> {:error, 400, "Lambda already exists"}
+			is_nil(lambdaItem) -> createLambda(conn.params)
+		end
+
+		{_status, httpCode, data} = returnData
+
+		send_resp(conn, httpCode, data)
 	end
 
 	get "/:lambdaName" do
@@ -61,23 +97,14 @@ defmodule Freya.HTTP.APIRouter do
 
 		lambdaItem = Freya.Repo.one(query)
 
-		IO.inspect lambdaItem
+		result = cond do
+			is_nil(lambdaItem) -> {:error, 404, "Lambda not found"}
+			!is_nil(lambdaItem) -> executeLambda(lambdaItem)
+		end
 
-		filePath = Path.join(File.cwd!(), lambdaItem.file)
-		
-		result = 
-			if (lambdaItem.runFunction) do
-				NodeJS.call({filePath, lambdaItem.runFunction})
-			else
-				NodeJS.call(filePath)
-			end
-			
-		IO.inspect result
-		
-		{ status, output } = result
+		{_status, httpCode, output} = result
 
-
-		send_resp(conn, 200, output)
+		send_resp(conn, httpCode, output)
 	end
 
 	match _ do
