@@ -70,6 +70,18 @@ defmodule Freya.HTTP.APIRouter do
 		end
 	end
 	
+	@doc """
+	Deletes a lambda
+	"""
+	def deleteLambda(lambda) do
+		filePath = Path.join(File.cwd!(), lambda.file)
+		
+		Freya.Repo.delete! lambda
+
+		File.rm(filePath)
+
+		{:ok, 200, "Removed lambda"}
+	end
 
 	get "/" do
 		send_resp(conn, 200, "Hello from router")
@@ -90,6 +102,21 @@ defmodule Freya.HTTP.APIRouter do
 		{_status, httpCode, data} = returnData
 
 		send_resp(conn, httpCode, data)
+	end
+
+	delete "/:lambdaName" do
+		query = from l in Freya.Lambda.Item, where: l.name == ^lambdaName, select: l
+
+		lambdaItem = Freya.Repo.one(query)
+
+		result = cond do
+			is_nil(lambdaItem) -> {:error, 404, "Lambda not found"}
+			!is_nil(lambdaItem) -> deleteLambda(lambdaItem)
+		end
+
+		{_status, httpCode, output} = result
+
+		send_resp(conn, httpCode, output)
 	end
 
 	get "/:lambdaName" do
