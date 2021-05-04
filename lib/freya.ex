@@ -19,7 +19,7 @@ defmodule Freya do
 
 		supervisorChildren = [
 			{NodeJS.Supervisor, [path: jsPath, pool_size: 4]},
-			{Plug.Cowboy, scheme: :http, plug: Freya.HTTP.MyPlug, options: [port: 4001]},
+			{Plug.Cowboy, scheme: :http, plug: Freya.HTTP.APIRouter, options: [port: 4001]},
 		]
 
 		Supervisor.start_link(supervisorChildren, supervisorOpts)
