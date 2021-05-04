@@ -27,6 +27,8 @@ defmodule Freya.MixProject do
 			{:vapor, "~> 0.10"},
 			{:nodejs, "~> 2.0"},
 			{:plug_cowboy, "~> 2.0"},
+			{:ecto_sql, "~> 3.2"},
+			{:ecto_sqlite3, "~> 0.5.5"},
 		]
 	end
 end

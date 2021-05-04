@@ -29,3 +29,12 @@ freya-*.tar
 # Env
 
 .env
+
+# DB
+freya.db
+freya.db-shm
+freya.db-wal
+
+# JS Uploads
+
+js/*.js-*

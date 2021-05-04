@@ -9,6 +9,7 @@ defmodule Freya do
 	"""
 
 	def start(_, _) do
+
 		# config = Vapor.load!(Freya.AppConfig)
 
 		# IO.puts("Port: " <> config.http.port)
@@ -20,6 +21,7 @@ defmodule Freya do
 		supervisorChildren = [
 			{NodeJS.Supervisor, [path: jsPath, pool_size: 4]},
 			{Plug.Cowboy, scheme: :http, plug: Freya.HTTP.APIRouter, options: [port: 4001]},
+			Freya.Repo,
 		]
 
 		Supervisor.start_link(supervisorChildren, supervisorOpts)
